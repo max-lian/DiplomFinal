@@ -18,6 +18,7 @@ class moveAnimation:
         UP = []
         RIGHT = []
         LEFT = []
+        SENSORS = []
         for i in range (range1):
             x = ANIM[i][0]
             y = ANIM[i][1]
@@ -25,6 +26,7 @@ class moveAnimation:
             UP.append(ANIM[i][3])
             RIGHT.append(ANIM[i][4])
             LEFT.append(ANIM[i][5])
+            SENSORS.append(ANIM[i][6])
             ANIM[i] = copy.deepcopy(map)
             ANIM[i][x][y] = 3
 #        print(down[0])
@@ -35,11 +37,13 @@ class moveAnimation:
             up.set_text('UP = %f' % UP[i])
             right.set_text('RIGHT = %f' % RIGHT[i])
             left.set_text('LEFT = %f' % LEFT[i])
+            sensors.set_text(SENSORS[i])
         fig, ax = plt.subplots()
         down = ax.text(0.4, -0.1, '', transform=ax.transAxes)
         up = ax.text(0.4, 1.1, '', transform=ax.transAxes)
         right = ax.text(1.02, 0.5, '', transform=ax.transAxes)
         left = ax.text(-0.4, 0.5, '', transform=ax.transAxes)
+        sensors = ax.text(0.9, 1.1, '', transform=ax.transAxes)
         matrice = ax.matshow(ANIM[0])
         ani = animation.FuncAnimation(fig, update, frames=range1, interval=1000)
         ani.save('map2.mp4', writer=writer)

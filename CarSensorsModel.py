@@ -17,7 +17,7 @@ N = 20
 
 class Q:
     def __init__(self, state = {}):
-        self.gamma = 0.9
+        self.gamma = 0.4
         self.alpha = 0.1
         self.state = state
 
@@ -25,21 +25,24 @@ class Q:
         self.plr = plr
 
     def run_model(self, silent=1):
-        self.plr.curr_state = tuple(self.plr.get_features()) + (self.plr.dx, self.plr.dy)
-        #forbidWay = tuple(self.plr.get_features()) + (self.plr.dx * (-1), self.plr.dy * (-1))
+        self.plr.curr_state = tuple(self.plr.get_features())
+        forbidWay = tuple(self.plr.get_features()) + (self.plr.dx * (-1), self.plr.dy * (-1))
         r = self.plr.reward
         if self.plr.prev_state not in self.state:
             self.state[self.plr.prev_state] = 0
-
-        nvec = []
-        for i in self.plr.actions:
-            cstate = self.plr.curr_state[:-2] + (i[0], i[1])
-            if cstate not in self.state:
-                self.state[cstate] = 0
-            #if cstate != forbidWay:
-            nvec.append(self.state[cstate])
-
-        nvec = max(nvec)
+        if r == -100:
+            nvec = 0
+        else:
+            nvec = []
+            for i in self.plr.actions:
+                act = self.plr.changeSetup(i[0], i[1])
+                cstate = self.plr.curr_state  + (act, 0)
+                if act != 'b' and cstate not in self.state:
+                    self.state[cstate] = 0
+                if cstate != forbidWay:
+                    nvec.append(self.state[cstate])
+            #print(self.plr.prev_state, r, nvec)
+            nvec = max(nvec)
         self.state[self.plr.prev_state] = self.state[self.plr.prev_state] + self.alpha * (-self.state[self.plr.prev_state]
                 + r + self.gamma * nvec)
 
@@ -65,6 +68,7 @@ class W:
                 flag = False
                 self.P.x = x
                 self.P.y = y
+            #print(self.P.x, self.P.y)
 
     def step(self):
         self.P.move()
@@ -83,7 +87,7 @@ class W:
 
     def get_reward(self, end_bool, iteration):
         if end_bool == 0:
-            self.P.reward = 1
+            self.P.reward = 10
         if end_bool == 1:
             self.P.reward = -100
 
@@ -105,6 +109,7 @@ class W:
                     if namea not in self.QM.state:
                         self.QM.state[namea] = 0
                     ANIM[iter].append(self.QM.state[namea])
+                ANIM[iter].append(name1)
             #exception
             if iter > 1000:
                 print("iterations:", iter, end_bool, "sensors:", self.P.get_features(), "dx,dy", self.P.dx, self.P.dy,
@@ -139,6 +144,7 @@ class P(un):
         self.lastdx = -1
         self.lastdy = 0
         self.eps = eps
+        self.movmnt = 1
         un.__init__(self, x, y)
         self.prev_state = tuple(self.get_features()) + (self.dx, self.dy)
         self.curr_state = tuple(self.get_features()) + (self.dx, self.dy)
@@ -160,31 +166,46 @@ class P(un):
         features.append(self.sensorController.middleSensor.distance)
         features.append(self.sensorController.rightMiddleSensor.distance)
         features.append(self.sensorController.rightSensor.distance)
-        features.append(self.sensorController.backSensor.distance)
+        #features.append(self.movmnt)
+        #features.append(self.dy)
+        #features.append(self.sensorController.backSensor.distance)
         return features
     def strtg(self):
         randomnum = random.random()
         if  randomnum < self.eps:
             act = random.choice(self.actions)
+            while act == (-self.dx, -self.dy):
+                act = random.choice(self.actions)
         else:
             name1 = tuple(self.get_features())
             best = [(0, 0), float('-inf')]
             for i in self.actions:
-                namea = name1 + (i[0], i[1])
+                namea = name1 + (self.changeSetup(i[0], i[1]), 0)
                 #if self.eps == 0:
                 #    print("namea: ",namea, self.QM.state[namea])
                 if namea not in self.W.QM.state:
                     self.W.QM.state[namea] = 0
-                if best[1] < self.W.QM.state[namea]:
+                if best[1] < self.W.QM.state[namea] and (self.dx != -i[0] or self.dy != -i[1]):
                     best = [i, self.W.QM.state[namea]]
             act = best[0]
             #if self.eps == 0:
             #    print("namea act: ", act)
         return act
-
+    def changeSetup(self, tempDx, tempDy):
+        movmnt = 0
+        if self.dx == tempDx and self.dy == tempDy:
+            movmnt = 1
+        if tempDx == - self.dy and tempDy == self.dx:
+            movmnt = 2
+        if tempDx == self.dy and tempDy == -self.dx:
+            movmnt = 3
+        return movmnt
     def move(self):
-        self.dx, self.dy = self.strtg()
+        tempDx, tempDy = self.strtg()
+        self.movmnt = self.changeSetup(tempDx, tempDy)
         self.prev_state = tuple(self.get_features()) + (self.dx, self.dy)
+        self.dx = tempDx
+        self.dy = tempDy
         a = self.x + self.dx
         b = self.y + self.dy
         expr = ((0 <= a < N) and (0 <= b < N))
@@ -232,14 +253,14 @@ class sensorsController():
         self.middleSensor = sensor(middleSensorLenght)
         self.rightMiddleSensor = sensor(rightMiddleSensorLenght)
         self.rightSensor = sensor(rightSensorLenght)
-        self.backSensor = sensor(backSensorLenght)
+        #self.backSensor = sensor(backSensorLenght)
     def collectData(self, player : P):
         self.leftSensor.distance = 1
         self.leftMiddleSensor.distance = 1
         self.middleSensor.distance = 1
         self.rightMiddleSensor.distance = 1
         self.rightSensor.distance = 1
-        self.backSensor.distance = 1
+        #self.backSensor.distance = 1
         x, y = player.getxy()
         dx, dy = player.get_dxdy()
         #print("collectData: ", x, y, dx, dy)
@@ -250,7 +271,7 @@ class sensorsController():
             self.middleSensor.distance = 0
             self.rightMiddleSensor.distance = 0
             self.rightSensor.distance = 0
-            self.backSensorLenght = 0
+            #self.backSensorLenght = 0
             return 0
         i = 1
         while i <= leftSensorLenght and map[x - dy*i][y + dx*i] != 1:
@@ -273,9 +294,11 @@ class sensorsController():
             self.rightSensor.distance += 1
             i += 1
         i = 1
+        '''''
         while i <= backSensorLenght and map[x - dx * i][y - dy * i] != 1:
             self.backSensor.distance += 1
             i += 1
+        '''
 class MapGenerator:
     def generateMap(map1, eps):
         for i in range(1, N-1):
@@ -306,17 +329,17 @@ if __name__=="__main__":
         print(' ')
         for j in range(0, N):
             print(map[i][j], end=''),
-    #QmodelStates = {}
-    QmodelStates = FileWR.FileWR.readQ('Qmodel.txt', 8)
-    for i in QmodelStates:
-       print(i, QmodelStates[i])
+    QmodelStates = {}
+    #QmodelStates = FileWR.FileWR.readQ('Qmodel.txt', 7)
+    #for i in QmodelStates:
+       #print(i, QmodelStates[i])
     QModel = Q(QmodelStates)
-    giter = 00000
+    giter = 100000
     for i in range(giter):
         if i % 2 == 0:
-            wr = W(map, QModel, 0.2, True)
+            wr = W(map, QModel, 0.2,0, True)
         else:
-            wr = W(map, QModel, 0.9, True)
+            wr = W(map, QModel, 0.9,0, True)
         iter = wr.play()
         if i % 100 == 0:
             print(i, iter)
@@ -327,8 +350,16 @@ if __name__=="__main__":
     for i in QModel.state:
         print(i, QModel.state[i])
     '''
+    with open('map2.txt') as file:
+        file = file.read()
+        q = file.replace(' ', '')
+        q = q.replace('\n', '')
+        for i in range(0, N):
+            for j in range(0, N):
+                map[i][j] = (int(q[j + i * N]))
+                # print(j + i * 10, q[j + i * 10])
     FileWR.FileWR.writeQ(QModel, 'Qmodel.txt')
     animation = plot_animation.moveAnimation()
-    wr = W(map, QModel, 0)
+    wr = W(map, QModel, 0,0, True)
     anim = wr.play(True)
     animation.animate(map, anim)
