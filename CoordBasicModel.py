@@ -2,6 +2,8 @@ import enum
 import random
 import time
 from abc import abstractmethod
+
+import FileWR
 import plot_animation
 
 #Параметры
@@ -15,10 +17,10 @@ n = 24
 m = 24
 
 class Q:
-    def __init__(self):
+    def __init__(self, state = {}):
         self.gamma = 0.9
         self.alpha = 0.1
-        self.state = {}
+        self.state = state
 
     def get_wp(self, plr):
         self.plr = plr
@@ -27,7 +29,8 @@ class Q:
         self.plr.curr_state = tuple(self.plr.get_features()) + (self.plr.dx, self.plr.dy)
 
         r = self.plr.reward
-        #print(r)
+        if r == -100:
+            print(r)
         if self.plr.prev_state not in self.state:
             self.state[self.plr.prev_state] = 0
 
@@ -191,6 +194,8 @@ class P(un):
         randomnum = random.random()
         if  randomnum < self.eps:
             act = random.choice(self.actions)
+            while self.W.map[self.x + act[0]][self.y + act[1]] == 1 or (self.dx == -act[0] and self.dy == - act[1]):
+                act = random.choice(self.actions)
         else:
             name1 = tuple(self.get_features())
             best = [(0, 0), float('-inf')]
@@ -200,7 +205,7 @@ class P(un):
                 #    print("namea: ",namea, self.QM.state[namea])
                 if namea not in self.W.QM.state:
                     self.W.QM.state[namea] = 0
-                if best[1] < self.W.QM.state[namea]:
+                if self.W.map[self.x + i[0]][self.y + i[1]] != 1 and  best[1] < self.W.QM.state[namea] and (self.dx != -i[0] or self.dy != - i[1]):
                     best = [i, self.W.QM.state[namea]]
             act = best[0]
             #if self.eps == 0:
@@ -301,10 +306,15 @@ if __name__=="__main__":
         print(' ')
         for j in range(0, m):
             print(map[i][j], end=''),
-    QModel = Q()
-
-
-    for i in range(50000):
+    QmodelStates = {}
+    try:
+        QmodelStates = FileWR.FileWR.readQ('QmodelXY.txt', 4, 4)
+        for i in QmodelStates:
+            print(i, QmodelStates[i])
+    except FileNotFoundError:
+        print("file not found")
+    QModel = Q(QmodelStates)
+    for i in range(0000):
         if i % 2 == 0:
             wr = W(map, QModel, 0.2, 1, 1, 0, True)
         else:
@@ -315,6 +325,7 @@ if __name__=="__main__":
 
     for i in QModel.state:
         print(i, QModel.state[i])
+    FileWR.FileWR.writeQ(QModel, 'QmodelXY.txt')
     animation = plot_animation.moveAnimation()
     wr = W(map, QModel, 0, 1, 1, 0)
     anim = wr.play(True)
